@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Simple Angry Birds Clone</title>
+  <title>Angry Birds Mini – Physics</title>
   <style>
     body { margin: 0; background: #87ceeb; }
     canvas { display: block; margin: auto; background: #cceeff; }
@@ -15,31 +15,49 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
-let bird = { x: 150, y: 350, r: 15, vx: 0, vy: 0, flying: false };
-let pig = { x: 700, y: 360, r: 20 };
+const slingX = 150;
+const slingY = 350;
+
+let bird = { x: slingX, y: slingY, r: 15, vx: 0, vy: 0, flying: false };
 let gravity = 0.5;
 let drag = false;
-let startX, startY;
+let aimX = slingX, aimY = slingY;
+
+let blocks = [
+  { x: 650, y: 360, w: 40, h: 40, vx: 0, vy: 0, alive: true },
+  { x: 690, y: 320, w: 40, h: 40, vx: 0, vy: 0, alive: true },
+  { x: 730, y: 360, w: 40, h: 40, vx: 0, vy: 0, alive: true }
+];
 
 canvas.addEventListener('mousedown', e => {
   if (!bird.flying) {
     drag = true;
-    startX = e.offsetX;
-    startY = e.offsetY;
+    aimX = e.offsetX;
+    aimY = e.offsetY;
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (drag) {
+    aimX = e.offsetX;
+    aimY = e.offsetY;
+    bird.x = aimX;
+    bird.y = aimY;
   }
 });
 
 canvas.addEventListener('mouseup', e => {
   if (drag) {
     drag = false;
-    bird.vx = (startX - e.offsetX) / 5;
-    bird.vy = (startY - e.offsetY) / 5;
+    bird.vx = (slingX - aimX) / 5;
+    bird.vy = (slingY - aimY) / 5;
     bird.flying = true;
   }
 });
 
-function reset() {
-  bird.x = 150; bird.y = 350;
+function resetBird() {
+  bird.x = slingX;
+  bird.y = slingY;
   bird.vx = bird.vy = 0;
   bird.flying = false;
 }
@@ -50,16 +68,33 @@ function update() {
     bird.x += bird.vx;
     bird.y += bird.vy;
 
-    if (bird.y > 380) reset();
+    if (bird.y > 380) resetBird();
 
-    let dx = bird.x - pig.x;
-    let dy = bird.y - pig.y;
-    let dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist < bird.r + pig.r) {
-      alert('You hit the pig!');
-      reset();
-    }
+    blocks.forEach(b => {
+      if (!b.alive) return;
+      let cx = Math.max(b.x, Math.min(bird.x, b.x + b.w));
+      let cy = Math.max(b.y, Math.min(bird.y, b.y + b.h));
+      let dx = bird.x - cx;
+      let dy = bird.y - cy;
+      if (dx*dx + dy*dy < bird.r*bird.r) {
+        b.vx = bird.vx * 0.8;
+        b.vy = -5;
+      }
+    });
   }
+
+  blocks.forEach(b => {
+    if (!b.alive) return;
+    b.vy += gravity;
+    b.x += b.vx;
+    b.y += b.vy;
+    if (b.y + b.h > 400) {
+      b.y = 400 - b.h;
+      b.vy *= -0.3;
+      b.vx *= 0.8;
+      if (Math.abs(b.vy) < 1) b.vy = 0;
+    }
+  });
 }
 
 function draw() {
@@ -72,9 +107,17 @@ function draw() {
   // slingshot
   ctx.strokeStyle = '#654321';
   ctx.beginPath();
-  ctx.moveTo(130, 400);
-  ctx.lineTo(130, 320);
+  ctx.moveTo(slingX, 400);
+  ctx.lineTo(slingX, 300);
   ctx.stroke();
+
+  if (drag) {
+    ctx.strokeStyle = 'black';
+    ctx.beginPath();
+    ctx.moveTo(slingX, slingY);
+    ctx.lineTo(bird.x, bird.y);
+    ctx.stroke();
+  }
 
   // bird
   ctx.fillStyle = 'red';
@@ -82,11 +125,12 @@ function draw() {
   ctx.arc(bird.x, bird.y, bird.r, 0, Math.PI*2);
   ctx.fill();
 
-  // pig
-  ctx.fillStyle = 'green';
-  ctx.beginPath();
-  ctx.arc(pig.x, pig.y, pig.r, 0, Math.PI*2);
-  ctx.fill();
+  // blocks
+  ctx.fillStyle = '#8b4513';
+  blocks.forEach(b => {
+    if (b.alive)
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+  });
 }
 
 function loop() {
