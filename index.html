@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Simple Angry Birds Clone</title>
+  <style>
+    body { margin: 0; background: #87ceeb; }
+    canvas { display: block; margin: auto; background: #cceeff; }
+  </style>
+</head>
+<body>
+<canvas id="game" width="900" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let bird = { x: 150, y: 350, r: 15, vx: 0, vy: 0, flying: false };
+let pig = { x: 700, y: 360, r: 20 };
+let gravity = 0.5;
+let drag = false;
+let startX, startY;
+
+canvas.addEventListener('mousedown', e => {
+  if (!bird.flying) {
+    drag = true;
+    startX = e.offsetX;
+    startY = e.offsetY;
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (drag) {
+    drag = false;
+    bird.vx = (startX - e.offsetX) / 5;
+    bird.vy = (startY - e.offsetY) / 5;
+    bird.flying = true;
+  }
+});
+
+function reset() {
+  bird.x = 150; bird.y = 350;
+  bird.vx = bird.vy = 0;
+  bird.flying = false;
+}
+
+function update() {
+  if (bird.flying) {
+    bird.vy += gravity;
+    bird.x += bird.vx;
+    bird.y += bird.vy;
+
+    if (bird.y > 380) reset();
+
+    let dx = bird.x - pig.x;
+    let dy = bird.y - pig.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < bird.r + pig.r) {
+      alert('You hit the pig!');
+      reset();
+    }
+  }
+}
+
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // ground
+  ctx.fillStyle = '#55aa55';
+  ctx.fillRect(0,400,900,100);
+
+  // slingshot
+  ctx.strokeStyle = '#654321';
+  ctx.beginPath();
+  ctx.moveTo(130, 400);
+  ctx.lineTo(130, 320);
+  ctx.stroke();
+
+  // bird
+  ctx.fillStyle = 'red';
+  ctx.beginPath();
+  ctx.arc(bird.x, bird.y, bird.r, 0, Math.PI*2);
+  ctx.fill();
+
+  // pig
+  ctx.fillStyle = 'green';
+  ctx.beginPath();
+  ctx.arc(pig.x, pig.y, pig.r, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
