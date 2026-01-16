@@ -2,14 +2,16 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Game Đua Xe - Web Version</title>
+  <title>Game Đua Xe - Web Version (Enhanced)</title>
   <style>
     body { margin: 0; background: #222; }
     canvas { display: block; margin: auto; background: #555; }
+    #hint { color: #ccc; text-align: center; font-family: Arial; }
   </style>
 </head>
 <body>
 <canvas id="game" width="500" height="600"></canvas>
+<div id="hint">⬅️ ➡️ để lái | R để chơi lại | Tốc độ tăng theo điểm</div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -23,18 +25,20 @@ let player = { x: WIDTH/2 - 25, y: HEIGHT - 100, w: 50, h: 80, speed: 6 };
 
 // ===== XE ĐỐI THỦ =====
 let enemies = [];
-for (let i = 0; i < 3; i++) {
+const ENEMY_COUNT = 4;
+for (let i = 0; i < ENEMY_COUNT; i++) {
   enemies.push({
     x: Math.random() * (WIDTH - 110) + 60,
     y: Math.random() * -600,
     w: 50,
     h: 80,
-    speed: 5
+    speed: 4
   });
 }
 
 let score = 0;
 let gameOver = false;
+let explosion = null;
 
 // ===== ĐIỀU KHIỂN =====
 let keys = {};
@@ -44,8 +48,13 @@ document.addEventListener("keyup", e => keys[e.key] = false);
 function resetGame() {
   score = 0;
   gameOver = false;
+  player.speed = 6;
   player.x = WIDTH/2 - 25;
-  enemies.forEach(e => e.y = Math.random() * -600);
+  explosion = null;
+  enemies.forEach(e => {
+    e.y = Math.random() * -600;
+    e.speed = 4;
+  });
 }
 
 function drawRoad() {
@@ -60,6 +69,12 @@ function drawRoad() {
 
 function update() {
   if (gameOver) return;
+
+  // tăng độ khó theo điểm
+  if (score % 10 === 0 && score !== 0) {
+    player.speed = 6 + score * 0.05;
+    enemies.forEach(e => e.speed = 4 + score * 0.05);
+  }
 
   if (keys["ArrowLeft"] && player.x > 50) player.x -= player.speed;
   if (keys["ArrowRight"] && player.x < WIDTH - 100) player.x += player.speed;
@@ -79,8 +94,18 @@ function update() {
       player.y + player.h > e.y
     ) {
       gameOver = true;
+      explosion = { x: player.x + 25, y: player.y + 40, r: 10 };
     }
   });
+}
+
+function drawExplosion() {
+  if (!explosion) return;
+  ctx.strokeStyle = "orange";
+  ctx.beginPath();
+  ctx.arc(explosion.x, explosion.y, explosion.r, 0, Math.PI * 2);
+  ctx.stroke();
+  explosion.r += 4;
 }
 
 function draw() {
@@ -97,10 +122,11 @@ function draw() {
   ctx.fillText("Score: " + score, 10, 30);
 
   if (gameOver) {
-    ctx.font = "40px Arial";
-    ctx.fillText("GAME OVER", 120, 300);
-    ctx.font = "20px Arial";
-    ctx.fillText("Press R to Restart", 160, 340);
+    drawExplosion();
+    ctx.font = "36px Arial";
+    ctx.fillText("GAME OVER", 120, 280);
+    ctx.font = "18px Arial";
+    ctx.fillText("Press R to Restart", 170, 320);
   }
 }
 
