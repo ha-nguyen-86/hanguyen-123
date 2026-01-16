@@ -2,112 +2,109 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Racing Game – Pro Edition</title>
+  <title>Racing Game – Portfolio Edition</title>
   <style>
-    body { margin: 0; background: radial-gradient(#111,#000); }
-    canvas { display: block; margin: auto; background: #444; }
-    #ui { color:#0f0; text-align:center; font-family:Arial; margin-top:6px }
+    body { margin:0; background:linear-gradient(#050505,#111); font-family:Arial }
+    canvas { display:block; margin:auto; background:#333 }
+    #overlay{
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.75); color:#0f0; text-align:center
+    }
+    button{ padding:12px 28px; font-size:18px; margin-top:15px; cursor:pointer }
   </style>
 </head>
 <body>
+
 <canvas id="game" width="500" height="600"></canvas>
-<div id="ui">⬅️ ➡️ lái | SHIFT: Nitro | R: Restart</div>
+
+<div id="overlay">
+  <div>
+    <h1>RACING GAME</h1>
+    <p>Portfolio Edition</p>
+    <p>⬅️ ➡️ Lái | SHIFT Nitro | P Pause</p>
+    <button onclick="startGame()">START GAME</button>
+    <p id="best"></p>
+  </div>
+</div>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
+const overlay = document.getElementById('overlay');
+const bestTxt = document.getElementById('best');
 
-// ===== PLAYER =====
-let player = { x: W/2-25, y: H-100, w:50, h:80, speed:6, nitro:100 };
+let state = 'menu'; // menu | play | pause | gameover
 
-// ===== ENEMIES =====
-let enemies = Array.from({length:4},()=>spawnEnemy());
+let player, enemies, score, nitro, keys={};
+let bestScore = localStorage.getItem('bestScore') || 0;
+bestTxt.innerText = 'BEST SCORE: ' + bestScore;
+
+function init(){
+  player = { x:W/2-25, y:H-100, w:50, h:80, speed:6 };
+  enemies = Array.from({length:4},()=>spawnEnemy());
+  score = 0; nitro = 100;
+}
+
 function spawnEnemy(){
   return { x:Math.random()*(W-110)+60, y:Math.random()*-600, w:50, h:80, speed:4 };
 }
 
-// ===== POWER UPS =====
-let powerUps = [];
-function spawnPowerUp(){
-  powerUps.push({ x:Math.random()*(W-120)+60, y:-40, r:12, type:'nitro' });
+function startGame(){
+  init(); state='play'; overlay.style.display='none';
 }
 
-let keys={}, score=0, gameOver=false, flash=0;
-document.addEventListener('keydown',e=>keys[e.key]=true);
-document.addEventListener('keyup',e=>keys[e.key]=false);
-
-function reset(){
-  score=0; gameOver=false; player.x=W/2-25; player.speed=6; player.nitro=100;
-  enemies=enemies.map(()=>spawnEnemy()); powerUps=[];
+function gameOver(){
+  state='gameover'; overlay.style.display='flex';
+  if(score>bestScore){ bestScore=score; localStorage.setItem('bestScore',score); }
+  overlay.innerHTML = `<div><h1>GAME OVER</h1><p>Score: ${score}</p><p>Best: ${bestScore}</p><button onclick='location.reload()'>PLAY AGAIN</button></div>`;
 }
 
 function drawRoad(){
-  ctx.fillStyle='#444'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#333'; ctx.fillRect(0,0,W,H);
   ctx.fillStyle='#fff';
   for(let i=0;i<H;i+=30){ ctx.fillRect(W/2-5,(i+Date.now()/10)%H,10,20); }
 }
 
-function rectHit(a,b){
-  return a.x<a.x+a.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
-}
-
 function update(){
-  if(gameOver) return;
+  if(state!=='play') return;
 
-  // Nitro
-  let curSpeed = player.speed;
-  if(keys['Shift'] && player.nitro>0){ curSpeed+=6; player.nitro-=1; }
-  else player.nitro=Math.min(100,player.nitro+0.3);
+  let speed = player.speed;
+  if(keys['Shift'] && nitro>0){ speed+=6; nitro-=1; }
+  else nitro=Math.min(100,nitro+0.3);
 
-  if(keys['ArrowLeft'] && player.x>50) player.x-=curSpeed;
-  if(keys['ArrowRight'] && player.x<W-100) player.x+=curSpeed;
+  if(keys['ArrowLeft'] && player.x>50) player.x-=speed;
+  if(keys['ArrowRight'] && player.x<W-100) player.x+=speed;
 
   enemies.forEach(e=>{
     e.y+=e.speed+score*0.01;
-    if(e.y>H){ Object.assign(e,spawnEnemy()); score++; if(score%15===0) spawnPowerUp(); }
-    if(player.x<e.x+e.w && player.x+player.w>e.x && player.y<e.y+e.h && player.y+player.h>e.y){
-      gameOver=true; flash=10;
-    }
-  });
-
-  powerUps.forEach(p=>p.y+=3);
-  powerUps = powerUps.filter(p=>{
-    if(Math.hypot(player.x+25-p.x,player.y+40-p.y)<40){ player.nitro=100; return false; }
-    return p.y<H+40;
+    if(e.y>H){ Object.assign(e,spawnEnemy()); score++; }
+    if(player.x<e.x+e.w && player.x+player.w>e.x && player.y<e.y+e.h && player.y+player.h>e.y) gameOver();
   });
 }
 
 function draw(){
   drawRoad();
 
-  // Flash effect
-  if(flash>0){ ctx.fillStyle='rgba(255,0,0,0.2)'; ctx.fillRect(0,0,W,H); flash--; }
-
-  // Player
   ctx.fillStyle='lime'; ctx.fillRect(player.x,player.y,player.w,player.h);
-
-  // Enemies
   ctx.fillStyle='red'; enemies.forEach(e=>ctx.fillRect(e.x,e.y,e.w,e.h));
 
-  // PowerUps
-  ctx.fillStyle='cyan'; powerUps.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); });
-
-  // HUD
   ctx.fillStyle='#0f0'; ctx.font='18px Arial';
   ctx.fillText('Score: '+score,10,25);
   ctx.fillText('Nitro',10,50);
-  ctx.strokeStyle='#0f0'; ctx.strokeRect(70,38,100,10);
-  ctx.fillRect(70,38,player.nitro,10);
-
-  if(gameOver){
-    ctx.fillStyle='#fff'; ctx.font='36px Arial'; ctx.fillText('GAME OVER',110,300);
-    ctx.font='18px Arial'; ctx.fillText('Press R to Restart',160,340);
-  }
+  ctx.strokeRect(70,38,100,10);
+  ctx.fillRect(70,38,nitro,10);
 }
 
-function loop(){ if(keys['r']&&gameOver) reset(); update(); draw(); requestAnimationFrame(loop); }
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
 loop();
+
+addEventListener('keydown',e=>{
+  keys[e.key]=true;
+  if(e.key==='p' && state==='play'){ state='pause'; overlay.style.display='flex'; overlay.innerHTML='<h1>PAUSED</h1><p>Press P to resume</p>'; }
+  else if(e.key==='p' && state==='pause'){ state='play'; overlay.style.display='none'; }
+});
+addEventListener('keyup',e=>keys[e.key]=false);
 </script>
 </body>
 </html>
