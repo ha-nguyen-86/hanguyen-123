@@ -2,141 +2,111 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Game Đua Xe - Web Version (Enhanced)</title>
+  <title>Racing Game – Pro Edition</title>
   <style>
-    body { margin: 0; background: #222; }
-    canvas { display: block; margin: auto; background: #555; }
-    #hint { color: #ccc; text-align: center; font-family: Arial; }
+    body { margin: 0; background: radial-gradient(#111,#000); }
+    canvas { display: block; margin: auto; background: #444; }
+    #ui { color:#0f0; text-align:center; font-family:Arial; margin-top:6px }
   </style>
 </head>
 <body>
 <canvas id="game" width="500" height="600"></canvas>
-<div id="hint">⬅️ ➡️ để lái | R để chơi lại | Tốc độ tăng theo điểm</div>
+<div id="ui">⬅️ ➡️ lái | SHIFT: Nitro | R: Restart</div>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
 
-const WIDTH = canvas.width;
-const HEIGHT = canvas.height;
+// ===== PLAYER =====
+let player = { x: W/2-25, y: H-100, w:50, h:80, speed:6, nitro:100 };
 
-// ===== XE NGƯỜI CHƠI =====
-let player = { x: WIDTH/2 - 25, y: HEIGHT - 100, w: 50, h: 80, speed: 6 };
-
-// ===== XE ĐỐI THỦ =====
-let enemies = [];
-const ENEMY_COUNT = 4;
-for (let i = 0; i < ENEMY_COUNT; i++) {
-  enemies.push({
-    x: Math.random() * (WIDTH - 110) + 60,
-    y: Math.random() * -600,
-    w: 50,
-    h: 80,
-    speed: 4
-  });
+// ===== ENEMIES =====
+let enemies = Array.from({length:4},()=>spawnEnemy());
+function spawnEnemy(){
+  return { x:Math.random()*(W-110)+60, y:Math.random()*-600, w:50, h:80, speed:4 };
 }
 
-let score = 0;
-let gameOver = false;
-let explosion = null;
-
-// ===== ĐIỀU KHIỂN =====
-let keys = {};
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
-
-function resetGame() {
-  score = 0;
-  gameOver = false;
-  player.speed = 6;
-  player.x = WIDTH/2 - 25;
-  explosion = null;
-  enemies.forEach(e => {
-    e.y = Math.random() * -600;
-    e.speed = 4;
-  });
+// ===== POWER UPS =====
+let powerUps = [];
+function spawnPowerUp(){
+  powerUps.push({ x:Math.random()*(W-120)+60, y:-40, r:12, type:'nitro' });
 }
 
-function drawRoad() {
-  ctx.fillStyle = "#555";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+let keys={}, score=0, gameOver=false, flash=0;
+document.addEventListener('keydown',e=>keys[e.key]=true);
+document.addEventListener('keyup',e=>keys[e.key]=false);
 
-  ctx.fillStyle = "#fff";
-  for (let i = 0; i < HEIGHT; i += 40) {
-    ctx.fillRect(WIDTH/2 - 5, i, 10, 20);
-  }
+function reset(){
+  score=0; gameOver=false; player.x=W/2-25; player.speed=6; player.nitro=100;
+  enemies=enemies.map(()=>spawnEnemy()); powerUps=[];
 }
 
-function update() {
-  if (gameOver) return;
+function drawRoad(){
+  ctx.fillStyle='#444'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#fff';
+  for(let i=0;i<H;i+=30){ ctx.fillRect(W/2-5,(i+Date.now()/10)%H,10,20); }
+}
 
-  // tăng độ khó theo điểm
-  if (score % 10 === 0 && score !== 0) {
-    player.speed = 6 + score * 0.05;
-    enemies.forEach(e => e.speed = 4 + score * 0.05);
-  }
+function rectHit(a,b){
+  return a.x<a.x+a.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
+}
 
-  if (keys["ArrowLeft"] && player.x > 50) player.x -= player.speed;
-  if (keys["ArrowRight"] && player.x < WIDTH - 100) player.x += player.speed;
+function update(){
+  if(gameOver) return;
 
-  enemies.forEach(e => {
-    e.y += e.speed;
-    if (e.y > HEIGHT) {
-      e.y = Math.random() * -300;
-      e.x = Math.random() * (WIDTH - 110) + 60;
-      score++;
-    }
+  // Nitro
+  let curSpeed = player.speed;
+  if(keys['Shift'] && player.nitro>0){ curSpeed+=6; player.nitro-=1; }
+  else player.nitro=Math.min(100,player.nitro+0.3);
 
-    if (
-      player.x < e.x + e.w &&
-      player.x + player.w > e.x &&
-      player.y < e.y + e.h &&
-      player.y + player.h > e.y
-    ) {
-      gameOver = true;
-      explosion = { x: player.x + 25, y: player.y + 40, r: 10 };
+  if(keys['ArrowLeft'] && player.x>50) player.x-=curSpeed;
+  if(keys['ArrowRight'] && player.x<W-100) player.x+=curSpeed;
+
+  enemies.forEach(e=>{
+    e.y+=e.speed+score*0.01;
+    if(e.y>H){ Object.assign(e,spawnEnemy()); score++; if(score%15===0) spawnPowerUp(); }
+    if(player.x<e.x+e.w && player.x+player.w>e.x && player.y<e.y+e.h && player.y+player.h>e.y){
+      gameOver=true; flash=10;
     }
   });
+
+  powerUps.forEach(p=>p.y+=3);
+  powerUps = powerUps.filter(p=>{
+    if(Math.hypot(player.x+25-p.x,player.y+40-p.y)<40){ player.nitro=100; return false; }
+    return p.y<H+40;
+  });
 }
 
-function drawExplosion() {
-  if (!explosion) return;
-  ctx.strokeStyle = "orange";
-  ctx.beginPath();
-  ctx.arc(explosion.x, explosion.y, explosion.r, 0, Math.PI * 2);
-  ctx.stroke();
-  explosion.r += 4;
-}
-
-function draw() {
+function draw(){
   drawRoad();
 
-  ctx.fillStyle = "lime";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
+  // Flash effect
+  if(flash>0){ ctx.fillStyle='rgba(255,0,0,0.2)'; ctx.fillRect(0,0,W,H); flash--; }
 
-  ctx.fillStyle = "red";
-  enemies.forEach(e => ctx.fillRect(e.x, e.y, e.w, e.h));
+  // Player
+  ctx.fillStyle='lime'; ctx.fillRect(player.x,player.y,player.w,player.h);
 
-  ctx.fillStyle = "white";
-  ctx.font = "20px Arial";
-  ctx.fillText("Score: " + score, 10, 30);
+  // Enemies
+  ctx.fillStyle='red'; enemies.forEach(e=>ctx.fillRect(e.x,e.y,e.w,e.h));
 
-  if (gameOver) {
-    drawExplosion();
-    ctx.font = "36px Arial";
-    ctx.fillText("GAME OVER", 120, 280);
-    ctx.font = "18px Arial";
-    ctx.fillText("Press R to Restart", 170, 320);
+  // PowerUps
+  ctx.fillStyle='cyan'; powerUps.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); });
+
+  // HUD
+  ctx.fillStyle='#0f0'; ctx.font='18px Arial';
+  ctx.fillText('Score: '+score,10,25);
+  ctx.fillText('Nitro',10,50);
+  ctx.strokeStyle='#0f0'; ctx.strokeRect(70,38,100,10);
+  ctx.fillRect(70,38,player.nitro,10);
+
+  if(gameOver){
+    ctx.fillStyle='#fff'; ctx.font='36px Arial'; ctx.fillText('GAME OVER',110,300);
+    ctx.font='18px Arial'; ctx.fillText('Press R to Restart',160,340);
   }
 }
 
-function loop() {
-  if (keys["r"] && gameOver) resetGame();
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-
+function loop(){ if(keys['r']&&gameOver) reset(); update(); draw(); requestAnimationFrame(loop); }
 loop();
 </script>
 </body>
