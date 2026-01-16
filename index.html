@@ -1,145 +1,101 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Angry Birds Mini – Physics</title>
-  <style>
-    body { margin: 0; background: #87ceeb; }
-    canvas { display: block; margin: auto; background: #cceeff; }
-  </style>
-</head>
-<body>
-<canvas id="game" width="900" height="500"></canvas>
+import pygame
+import random
 
-<script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+pygame.init()
 
-const slingX = 150;
-const slingY = 350;
+# ====== MÀN HÌNH ======
+WIDTH, HEIGHT = 500, 600
+win = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Game Đua Xe")
 
-let bird = { x: slingX, y: slingY, r: 15, vx: 0, vy: 0, flying: false };
-let gravity = 0.5;
-let drag = false;
-let aimX = slingX, aimY = slingY;
+# ====== MÀU ======
+WHITE = (255, 255, 255)
+GRAY = (60, 60, 60)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
 
-let blocks = [
-  { x: 650, y: 360, w: 40, h: 40, vx: 0, vy: 0, alive: true },
-  { x: 690, y: 320, w: 40, h: 40, vx: 0, vy: 0, alive: true },
-  { x: 730, y: 360, w: 40, h: 40, vx: 0, vy: 0, alive: true }
-];
+# ====== XE NGƯỜI CHƠI ======
+player = pygame.Rect(WIDTH//2 - 25, HEIGHT - 100, 50, 80)
+player_speed = 6
 
-canvas.addEventListener('mousedown', e => {
-  if (!bird.flying) {
-    drag = true;
-    aimX = e.offsetX;
-    aimY = e.offsetY;
-  }
-});
+# ====== XE ĐỐI THỦ ======
+enemies = []
+for i in range(3):
+    enemies.append(
+        pygame.Rect(random.randint(60, WIDTH-110),
+                    random.randint(-600, -100),
+                    50, 80)
+    )
 
-canvas.addEventListener('mousemove', e => {
-  if (drag) {
-    aimX = e.offsetX;
-    aimY = e.offsetY;
-    bird.x = aimX;
-    bird.y = aimY;
-  }
-});
+enemy_speed = 5
 
-canvas.addEventListener('mouseup', e => {
-  if (drag) {
-    drag = false;
-    bird.vx = (slingX - aimX) / 5;
-    bird.vy = (slingY - aimY) / 5;
-    bird.flying = true;
-  }
-});
+# ====== ĐIỂM ======
+score = 0
+font = pygame.font.SysFont(None, 40)
 
-function resetBird() {
-  bird.x = slingX;
-  bird.y = slingY;
-  bird.vx = bird.vy = 0;
-  bird.flying = false;
-}
+clock = pygame.time.Clock()
+run = True
+game_over = False
 
-function update() {
-  if (bird.flying) {
-    bird.vy += gravity;
-    bird.x += bird.vx;
-    bird.y += bird.vy;
+# ====== HÀM VẼ ======
+def draw_road():
+    win.fill(GRAY)
+    for i in range(0, HEIGHT, 40):
+        pygame.draw.rect(win, WHITE, (WIDTH//2 - 5, i, 10, 20))
 
-    if (bird.y > 380) resetBird();
+def draw_text(text, x, y):
+    img = font.render(text, True, WHITE)
+    win.blit(img, (x, y))
 
-    blocks.forEach(b => {
-      if (!b.alive) return;
-      let cx = Math.max(b.x, Math.min(bird.x, b.x + b.w));
-      let cy = Math.max(b.y, Math.min(bird.y, b.y + b.h));
-      let dx = bird.x - cx;
-      let dy = bird.y - cy;
-      if (dx*dx + dy*dy < bird.r*bird.r) {
-        b.vx = bird.vx * 0.8;
-        b.vy = -5;
-      }
-    });
-  }
+# ====== GAME LOOP ======
+while run:
+    clock.tick(60)
 
-  blocks.forEach(b => {
-    if (!b.alive) return;
-    b.vy += gravity;
-    b.x += b.vx;
-    b.y += b.vy;
-    if (b.y + b.h > 400) {
-      b.y = 400 - b.h;
-      b.vy *= -0.3;
-      b.vx *= 0.8;
-      if (Math.abs(b.vy) < 1) b.vy = 0;
-    }
-  });
-}
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            run = False
 
-function draw() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+        if game_over and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_r:
+                # Reset game
+                score = 0
+                player.x = WIDTH//2 - 25
+                for e in enemies:
+                    e.y = random.randint(-600, -100)
+                game_over = False
 
-  // ground
-  ctx.fillStyle = '#55aa55';
-  ctx.fillRect(0,400,900,100);
+    if not game_over:
+        draw_road()
 
-  // slingshot
-  ctx.strokeStyle = '#654321';
-  ctx.beginPath();
-  ctx.moveTo(slingX, 400);
-  ctx.lineTo(slingX, 300);
-  ctx.stroke();
+        # ====== ĐIỀU KHIỂN ======
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT] and player.x > 50:
+            player.x -= player_speed
+        if keys[pygame.K_RIGHT] and player.x < WIDTH - 100:
+            player.x += player_speed
 
-  if (drag) {
-    ctx.strokeStyle = 'black';
-    ctx.beginPath();
-    ctx.moveTo(slingX, slingY);
-    ctx.lineTo(bird.x, bird.y);
-    ctx.stroke();
-  }
+        # ====== XE ĐỐI THỦ ======
+        for enemy in enemies:
+            enemy.y += enemy_speed
+            if enemy.y > HEIGHT:
+                enemy.y = random.randint(-300, -100)
+                enemy.x = random.randint(60, WIDTH-110)
+                score += 1
 
-  // bird
-  ctx.fillStyle = 'red';
-  ctx.beginPath();
-  ctx.arc(bird.x, bird.y, bird.r, 0, Math.PI*2);
-  ctx.fill();
+            if player.colliderect(enemy):
+                game_over = True
 
-  // blocks
-  ctx.fillStyle = '#8b4513';
-  blocks.forEach(b => {
-    if (b.alive)
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-  });
-}
+        # ====== VẼ ======
+        pygame.draw.rect(win, GREEN, player)
+        for enemy in enemies:
+            pygame.draw.rect(win, RED, enemy)
 
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
+        draw_text(f"Score: {score}", 10, 10)
 
-loop();
-</script>
-</body>
-</html>
+    else:
+        draw_text("GAME OVER", WIDTH//2 - 120, HEIGHT//2 - 40)
+        draw_text("Press R to Restart", WIDTH//2 - 160, HEIGHT//2 + 10)
+
+    pygame.display.update()
+
+pygame.quit()
