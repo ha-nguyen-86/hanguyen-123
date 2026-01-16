@@ -1,101 +1,117 @@
-import pygame
-import random
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Game Đua Xe - Web Version</title>
+  <style>
+    body { margin: 0; background: #222; }
+    canvas { display: block; margin: auto; background: #555; }
+  </style>
+</head>
+<body>
+<canvas id="game" width="500" height="600"></canvas>
 
-pygame.init()
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-# ====== MÀN HÌNH ======
-WIDTH, HEIGHT = 500, 600
-win = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Game Đua Xe")
+const WIDTH = canvas.width;
+const HEIGHT = canvas.height;
 
-# ====== MÀU ======
-WHITE = (255, 255, 255)
-GRAY = (60, 60, 60)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
+// ===== XE NGƯỜI CHƠI =====
+let player = { x: WIDTH/2 - 25, y: HEIGHT - 100, w: 50, h: 80, speed: 6 };
 
-# ====== XE NGƯỜI CHƠI ======
-player = pygame.Rect(WIDTH//2 - 25, HEIGHT - 100, 50, 80)
-player_speed = 6
+// ===== XE ĐỐI THỦ =====
+let enemies = [];
+for (let i = 0; i < 3; i++) {
+  enemies.push({
+    x: Math.random() * (WIDTH - 110) + 60,
+    y: Math.random() * -600,
+    w: 50,
+    h: 80,
+    speed: 5
+  });
+}
 
-# ====== XE ĐỐI THỦ ======
-enemies = []
-for i in range(3):
-    enemies.append(
-        pygame.Rect(random.randint(60, WIDTH-110),
-                    random.randint(-600, -100),
-                    50, 80)
-    )
+let score = 0;
+let gameOver = false;
 
-enemy_speed = 5
+// ===== ĐIỀU KHIỂN =====
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
 
-# ====== ĐIỂM ======
-score = 0
-font = pygame.font.SysFont(None, 40)
+function resetGame() {
+  score = 0;
+  gameOver = false;
+  player.x = WIDTH/2 - 25;
+  enemies.forEach(e => e.y = Math.random() * -600);
+}
 
-clock = pygame.time.Clock()
-run = True
-game_over = False
+function drawRoad() {
+  ctx.fillStyle = "#555";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-# ====== HÀM VẼ ======
-def draw_road():
-    win.fill(GRAY)
-    for i in range(0, HEIGHT, 40):
-        pygame.draw.rect(win, WHITE, (WIDTH//2 - 5, i, 10, 20))
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < HEIGHT; i += 40) {
+    ctx.fillRect(WIDTH/2 - 5, i, 10, 20);
+  }
+}
 
-def draw_text(text, x, y):
-    img = font.render(text, True, WHITE)
-    win.blit(img, (x, y))
+function update() {
+  if (gameOver) return;
 
-# ====== GAME LOOP ======
-while run:
-    clock.tick(60)
+  if (keys["ArrowLeft"] && player.x > 50) player.x -= player.speed;
+  if (keys["ArrowRight"] && player.x < WIDTH - 100) player.x += player.speed;
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            run = False
+  enemies.forEach(e => {
+    e.y += e.speed;
+    if (e.y > HEIGHT) {
+      e.y = Math.random() * -300;
+      e.x = Math.random() * (WIDTH - 110) + 60;
+      score++;
+    }
 
-        if game_over and event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_r:
-                # Reset game
-                score = 0
-                player.x = WIDTH//2 - 25
-                for e in enemies:
-                    e.y = random.randint(-600, -100)
-                game_over = False
+    if (
+      player.x < e.x + e.w &&
+      player.x + player.w > e.x &&
+      player.y < e.y + e.h &&
+      player.y + player.h > e.y
+    ) {
+      gameOver = true;
+    }
+  });
+}
 
-    if not game_over:
-        draw_road()
+function draw() {
+  drawRoad();
 
-        # ====== ĐIỀU KHIỂN ======
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT] and player.x > 50:
-            player.x -= player_speed
-        if keys[pygame.K_RIGHT] and player.x < WIDTH - 100:
-            player.x += player_speed
+  ctx.fillStyle = "lime";
+  ctx.fillRect(player.x, player.y, player.w, player.h);
 
-        # ====== XE ĐỐI THỦ ======
-        for enemy in enemies:
-            enemy.y += enemy_speed
-            if enemy.y > HEIGHT:
-                enemy.y = random.randint(-300, -100)
-                enemy.x = random.randint(60, WIDTH-110)
-                score += 1
+  ctx.fillStyle = "red";
+  enemies.forEach(e => ctx.fillRect(e.x, e.y, e.w, e.h));
 
-            if player.colliderect(enemy):
-                game_over = True
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.fillText("Score: " + score, 10, 30);
 
-        # ====== VẼ ======
-        pygame.draw.rect(win, GREEN, player)
-        for enemy in enemies:
-            pygame.draw.rect(win, RED, enemy)
+  if (gameOver) {
+    ctx.font = "40px Arial";
+    ctx.fillText("GAME OVER", 120, 300);
+    ctx.font = "20px Arial";
+    ctx.fillText("Press R to Restart", 160, 340);
+  }
+}
 
-        draw_text(f"Score: {score}", 10, 10)
+function loop() {
+  if (keys["r"] && gameOver) resetGame();
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
 
-    else:
-        draw_text("GAME OVER", WIDTH//2 - 120, HEIGHT//2 - 40)
-        draw_text("Press R to Restart", WIDTH//2 - 160, HEIGHT//2 + 10)
-
-    pygame.display.update()
-
-pygame.quit()
+loop();
+</script>
+</body>
+</html>
