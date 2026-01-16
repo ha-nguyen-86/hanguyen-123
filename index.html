@@ -2,43 +2,35 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Racing Game – Portfolio Edition</title>
+  <title>Racing Game – PRO SHOWCASE</title>
   <style>
-    body { margin:0; background:linear-gradient(#050505,#111); font-family:Arial }
-    canvas { display:block; margin:auto; background:#333 }
-    #overlay{
-      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.75); color:#0f0; text-align:center
-    }
-    button{ padding:12px 28px; font-size:18px; margin-top:15px; cursor:pointer }
+    body { margin:0; background:#000; font-family:Arial }
+    canvas { display:block; margin:auto; background:#222 }
+    #overlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.7); color:#0f0; text-align:center }
   </style>
 </head>
 <body>
 
 <canvas id="game" width="500" height="600"></canvas>
-
-<div id="overlay">
-  <div>
-    <h1>RACING GAME</h1>
-    <p>Portfolio Edition</p>
-    <p>⬅️ ➡️ Lái | SHIFT Nitro | P Pause</p>
-    <button onclick="startGame()">START GAME</button>
-    <p id="best"></p>
-  </div>
-</div>
+<div id="overlay">Press START</div>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 const overlay = document.getElementById('overlay');
-const bestTxt = document.getElementById('best');
 
-let state = 'menu'; // menu | play | pause | gameover
+let lastTime = performance.now();
+let fps = 0;
 
-let player, enemies, score, nitro, keys={};
-let bestScore = localStorage.getItem('bestScore') || 0;
-bestTxt.innerText = 'BEST SCORE: ' + bestScore;
+let state = 'menu';
+let player, enemies, score, nitro;
+let shake = 0, slowMo = 1;
+let keys = {};
+
+function spawnEnemy(){
+  return { x:Math.random()*(W-110)+60, y:Math.random()*-600, w:50, h:80, speed:4 };
+}
 
 function init(){
   player = { x:W/2-25, y:H-100, w:50, h:80, speed:6 };
@@ -46,65 +38,90 @@ function init(){
   score = 0; nitro = 100;
 }
 
-function spawnEnemy(){
-  return { x:Math.random()*(W-110)+60, y:Math.random()*-600, w:50, h:80, speed:4 };
-}
+init();
 
-function startGame(){
-  init(); state='play'; overlay.style.display='none';
-}
+addEventListener('keydown',e=>{
+  keys[e.key]=true;
+  if(state==='menu'){ state='play'; overlay.style.display='none'; }
+});
+addEventListener('keyup',e=>keys[e.key]=false);
 
-function gameOver(){
-  state='gameover'; overlay.style.display='flex';
-  if(score>bestScore){ bestScore=score; localStorage.setItem('bestScore',score); }
-  overlay.innerHTML = `<div><h1>GAME OVER</h1><p>Score: ${score}</p><p>Best: ${bestScore}</p><button onclick='location.reload()'>PLAY AGAIN</button></div>`;
-}
-
-function drawRoad(){
-  ctx.fillStyle='#333'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#fff';
-  for(let i=0;i<H;i+=30){ ctx.fillRect(W/2-5,(i+Date.now()/10)%H,10,20); }
-}
-
-function update(){
+function update(dt){
   if(state!=='play') return;
 
   let speed = player.speed;
-  if(keys['Shift'] && nitro>0){ speed+=6; nitro-=1; }
-  else nitro=Math.min(100,nitro+0.3);
+  let shakeX = 0, shakeY = 0;
 
-  if(keys['ArrowLeft'] && player.x>50) player.x-=speed;
-  if(keys['ArrowRight'] && player.x<W-100) player.x+=speed;
+  if(keys['Shift'] && nitro>0){
+    speed += 6;
+    nitro -= 1;
+    shake = 5; // rung xe khi nitro
+  } else nitro = Math.min(100, nitro + 0.4);
+
+  if(keys['ArrowLeft'] && player.x>50) player.x -= speed;
+  if(keys['ArrowRight'] && player.x<W-100) player.x += speed;
 
   enemies.forEach(e=>{
-    e.y+=e.speed+score*0.01;
-    if(e.y>H){ Object.assign(e,spawnEnemy()); score++; }
-    if(player.x<e.x+e.w && player.x+player.w>e.x && player.y<e.y+e.h && player.y+player.h>e.y) gameOver();
+    e.y += (e.speed + score*0.01) * slowMo;
+    if(e.y > H){ Object.assign(e, spawnEnemy()); score++; }
+    if(player.x<e.x+e.w && player.x+player.w>e.x && player.y<e.y+e.h && player.y+player.h>e.y){
+      state='crash'; slowMo=0.2; shake=20;
+      setTimeout(()=>state='gameover',600);
+    }
   });
 }
 
 function draw(){
-  drawRoad();
+  ctx.save();
 
-  ctx.fillStyle='lime'; ctx.fillRect(player.x,player.y,player.w,player.h);
-  ctx.fillStyle='red'; enemies.forEach(e=>ctx.fillRect(e.x,e.y,e.w,e.h));
+  // camera shake
+  if(shake>0){
+    ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+    shake--;
+  }
 
-  ctx.fillStyle='#0f0'; ctx.font='18px Arial';
-  ctx.fillText('Score: '+score,10,25);
-  ctx.fillText('Nitro',10,50);
-  ctx.strokeRect(70,38,100,10);
-  ctx.fillRect(70,38,nitro,10);
+  ctx.fillStyle='#222'; ctx.fillRect(0,0,W,H);
+
+  // road
+  ctx.fillStyle='#fff';
+  for(let i=0;i<H;i+=30){ ctx.fillRect(W/2-5,(i+Date.now()/10)%H,10,20); }
+
+  // player (rung nhẹ khi nitro)
+  ctx.fillStyle='lime';
+  let px = player.x + (keys['Shift']?Math.random()*2:0);
+  ctx.fillRect(px,player.y,player.w,player.h);
+
+  // enemies
+  ctx.fillStyle='red';
+  enemies.forEach(e=>ctx.fillRect(e.x,e.y,e.w,e.h));
+
+  // HUD
+  ctx.fillStyle='#0f0'; ctx.font='14px Arial';
+  ctx.fillText('Score: '+score,10,20);
+  ctx.fillText('FPS: '+fps,10,40);
+  ctx.strokeRect(70,50,100,8);
+  ctx.fillRect(70,50,nitro,8);
+
+  // mini-map
+  ctx.strokeRect(400,10,80,100);
+  ctx.fillRect(400+(player.x/W)*80,10+(player.y/H)*100,4,6);
+
+  ctx.restore();
+
+  if(state==='gameover'){
+    overlay.style.display='flex';
+    overlay.innerHTML=`<div><h1>GAME OVER</h1><p>Score: ${score}</p><p>Press F5</p></div>`;
+  }
 }
 
-function loop(){ update(); draw(); requestAnimationFrame(loop); }
-loop();
-
-addEventListener('keydown',e=>{
-  keys[e.key]=true;
-  if(e.key==='p' && state==='play'){ state='pause'; overlay.style.display='flex'; overlay.innerHTML='<h1>PAUSED</h1><p>Press P to resume</p>'; }
-  else if(e.key==='p' && state==='pause'){ state='play'; overlay.style.display='none'; }
-});
-addEventListener('keyup',e=>keys[e.key]=false);
+function loop(time){
+  const dt = time-lastTime; lastTime=time;
+  fps = Math.round(1000/dt);
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
